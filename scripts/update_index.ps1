@@ -128,7 +128,7 @@ if ($readme -notmatch [regex]::Escape($beginMarker) -or $readme -notmatch [regex
     $readme = [regex]::Replace($readme, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $replacement })
 }
 
-Set-Content -Encoding utf8 -LiteralPath $readmePath -Value $readme
+Set-Content -Encoding utf8 -LiteralPath $readmePath -Value ($readme.TrimEnd() + "`r`n")
 Write-Host "Updated index: $readmePath"
 
 $markerPath = Join-Path $RepoRoot ".prompt-card-refresh"
