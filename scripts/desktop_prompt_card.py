@@ -446,11 +446,23 @@ class PromptCard(tk.Tk):
 
     def _paste_into_codex(self) -> bool:
         script = (
+            "Add-Type @'\n"
+            "using System;\n"
+            "using System.Runtime.InteropServices;\n"
+            "public class Win32 {\n"
+            "  [DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);\n"
+            "  [DllImport(\"user32.dll\")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);\n"
+            "}\n"
+            "'@; "
+            "$p = Get-Process Codex -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; "
+            "if (-not $p) { exit 1 }; "
+            "[Win32]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null; "
+            "[Win32]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; "
+            "Start-Sleep -Milliseconds 500; "
             "$ws = New-Object -ComObject WScript.Shell; "
-            "$ok = $ws.AppActivate('Codex'); "
-            "Start-Sleep -Milliseconds 250; "
-            "if ($ok) { $ws.SendKeys('^v') }; "
-            "if ($ok) { exit 0 } else { exit 1 }"
+            "$ws.SendKeys('^v'); "
+            "exit 0"
         )
         try:
             result = subprocess.run(
