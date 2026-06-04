@@ -137,6 +137,7 @@ class PromptCard(tk.Tk):
             list_container,
             orient="vertical",
             command=self.list_canvas.yview,
+            width=18,
         )
         self.recent_frame = tk.Frame(self.list_canvas, bg="#f7f7f4")
         self.recent_window = self.list_canvas.create_window(
