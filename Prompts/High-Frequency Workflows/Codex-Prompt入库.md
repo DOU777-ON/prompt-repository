@@ -2,7 +2,7 @@
 title: Codex-Prompt入库
 category: high-frequency
 status: favorite
-version: v1.4
+version: v1.5
 tags:
   - codex
   - prompt-intake
@@ -20,14 +20,16 @@ source: internal
 
 - 适合在一次 Codex 任务结束后，把好用提示词沉淀为资产。
 - 如果用户没有指定目录，按自动分类规则选择目录；只有信息不足或未经验证时才进入测试。
-- 如果用户明确说“已经验证过”，可保存为 scenario + validated。
+- 如果用户明确说“已经验证过”，且有使用经验记录，可保存为 scenario + validated。
 - 入库前应先读取或参考当前 README、Prompt_Template 和自动分类保存规则，确保 Codex 使用的是最新版库规则。
 - 如果 Obsidian 库规则刚被修改，必须同步更新 Codex 相关高频工作流后再保存新 Prompt。
-- 普通 Prompt 入库时只保留 YAML、使用经验和优化记录；角色卡继续使用角色卡模板。
+- 普通 Prompt 入库时必须保留 YAML、标题、`## Prompt 正文`、`## 使用经验`、`## 优化记录`；角色卡继续使用角色卡模板。
 - 用户只说“优化入库”时，优先优化已有入库工作流或分类规则，不新建重复 Prompt。
 - 入库或迁移完成后必须运行 `scripts/update_index.ps1`，更新 README 索引。
 - 如果变更应长期保留，提交并推送到 GitHub；只忽略 Obsidian 本地 UI 配置等未明确要求同步的文件。
 - 入库时应把真正可复用的 Prompt 放在 `## Prompt 正文` 下，便于后续检索和调用。
+- `draft` 只表示想法、片段或未完成文本；`testing` 表示有完整正文且能执行；`validated` 表示至少用过一次并记录使用经验；`favorite` 表示高频稳定资产或高频工作流。
+- 没有完整 `## Prompt 正文` 的内容不得进入 `Prompts/📚 专业场景`，除非用户明确要求临时占位。
 
 ## 优化记录
 
@@ -38,3 +40,4 @@ source: internal
 | v1.2 | 2026-06-04 | 按新版 Prompt_Template 精简，仅保留使用经验和优化记录 |
 | v1.3 | 2026-06-04 | 增加 Obsidian 与 Codex 同步更新要求 |
 | v1.4 | 2026-06-04 | 增加入库后更新索引、GitHub 同步和 Prompt 正文复用规则 |
+| v1.5 | 2026-06-04 | 统一 Prompt 正文结构和质量门槛 |

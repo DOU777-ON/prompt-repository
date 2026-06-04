@@ -18,8 +18,16 @@ C:\Users\ROG\Documents\Prompt Repository
 - 收藏或书签式 Prompt 保存到 `Prompts/Favorites`，使用 `Prompts/Favorites/收藏-模板.md`。
 - 角色卡使用 `Prompts/📄 模板/Role_Template.md`，保存到 `Prompts/🧩 角色卡`。
 - 未验证 Prompt 保存到 `Prompts/🧪 测试`。
-- 已验证场景 Prompt 保存到 `Prompts/📚 专业场景`。
+- `Prompts/📚 专业场景` 默认只保存 `testing` 或 `validated` 状态的场景 Prompt；正文未完成的 `draft` 不进入专业场景，除非用户明确要求临时占位。
 - 高频工作流保存到 `Prompts/High-Frequency Workflows`。
+- 所有可调用普通 Prompt 必须包含 `## Prompt 正文`；调用时优先使用该段内容。
+
+## 质量门槛
+
+- `draft`：只有想法、片段或未完成文本；不得进入专业场景，除非用户明确要求临时占位。
+- `testing`：有完整 `## Prompt 正文`，能执行，但尚未有真实使用反馈。
+- `validated`：至少使用过一次，并在 `## 使用经验` 里记录适合输入、不适合输入、常见问题、最佳使用方式。
+- `favorite`：高频、稳定、优先调用；必须已经达到 `validated` 水平，或本身是高频工作流/规则文件。
 
 ## Frontmatter
 
@@ -54,5 +62,5 @@ source: internal
 ```
 
 ```text
-请将下面这个提示词加入 Prompt 库。你先判断分类，然后自动整理 YAML、使用经验和优化记录，保存到最合适的位置，并更新索引。
+请将下面这个提示词加入 Prompt 库。你先判断分类，然后自动整理 YAML、Prompt 正文、使用经验和优化记录，保存到最合适的位置，并更新索引。
 ```

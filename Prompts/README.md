@@ -22,17 +22,26 @@ Prompts
 - 角色卡：使用 `📄 模板/Role_Template.md`。
 - 临时收藏：放 `Favorites`。
 - 新 Prompt：先放 `🧪 测试`。
-- 已验证场景：放 `📚 专业场景`。
+- 专业场景：放 `📚 专业场景`，默认只允许 `testing` 或 `validated`。
 - 高频工作流：放 `High-Frequency Workflows`。
+- 所有可调用普通 Prompt 必须包含 `## Prompt 正文`。
 
 普通 Prompt 结构：
 
 ```text
 YAML frontmatter
 # 标题
+## Prompt 正文
 ## 使用经验
 ## 优化记录
 ```
+
+质量门槛：
+
+- `draft`：只有想法、片段或未完成文本。
+- `testing`：有完整 Prompt 正文，能执行，尚未记录真实使用反馈。
+- `validated`：至少使用过一次，并记录使用经验。
+- `favorite`：高频、稳定、优先调用。
 
 ## 自动索引
 
@@ -58,7 +67,7 @@ YAML frontmatter
 
 | Title | Status | Tags | Updated | Path |
 |---|---|---|---|---|
-| 总图 | draft | prompt, 总图, 待补充 | 2026-06-04 | [📚 专业场景/总图.md](📚 专业场景/总图.md) |
+| 总图 | testing | prompt, 总图, engineering-layout, site-plan, general-plan | 2026-06-04 | [📚 专业场景/总图.md](📚 专业场景/总图.md) |
 
 ### 🧩 角色卡
 
