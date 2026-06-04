@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
@@ -33,10 +32,13 @@ class PromptCard(tk.Tk):
         self._drag_start_y = 0
         self._topmost = tk.BooleanVar(value=True)
         self._status = tk.StringVar(value="Ready")
+        self._git_status = tk.StringVar(value="Git: checking...")
         self._list_title = tk.StringVar(value="Recent Prompts")
+        self._search_query = tk.StringVar()
 
         self._build_ui()
         self.refresh()
+        self.update_git_status()
 
     def _build_ui(self) -> None:
         header = tk.Frame(self, bg="#202124", padx=12, pady=10)
@@ -79,6 +81,22 @@ class PromptCard(tk.Tk):
         self._button(controls, "Home", self.refresh).pack(side="left", padx=(0, 6))
         self._button(controls, "Open", self.open_repo).pack(side="left", padx=(0, 6))
         self._button(controls, "Sync", self.sync_repo).pack(side="right")
+
+        search = tk.Frame(body, bg="#f7f7f4")
+        search.pack(fill="x", pady=(0, 10))
+        search_entry = tk.Entry(
+            search,
+            textvariable=self._search_query,
+            relief="flat",
+            bg="#ffffff",
+            fg="#222222",
+            insertbackground="#222222",
+            font=("Segoe UI", 9),
+        )
+        search_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 6))
+        search_entry.bind("<Return>", lambda _event: self.search_prompts())
+        self._button(search, "Search", self.search_prompts).pack(side="left", padx=(0, 6))
+        self._button(search, "Clear", self.clear_search).pack(side="left")
 
         tk.Label(
             body,
@@ -130,6 +148,18 @@ class PromptCard(tk.Tk):
         self.list_canvas.bind("<Enter>", self._bind_mousewheel)
         self.list_canvas.bind("<Leave>", self._unbind_mousewheel)
 
+        git_status = tk.Label(
+            self,
+            textvariable=self._git_status,
+            bg="#f7f7f4",
+            fg="#555555",
+            anchor="w",
+            padx=10,
+            pady=4,
+            font=("Segoe UI", 9),
+        )
+        git_status.pack(fill="x")
+
         status = tk.Label(
             self,
             textvariable=self._status,
@@ -179,6 +209,7 @@ class PromptCard(tk.Tk):
 
         self._status.set("Updated")
         self._reset_list_scroll()
+        self.update_git_status()
 
     def _row(self, parent: tk.Widget, text: str, command) -> None:
         button = tk.Button(
@@ -217,6 +248,46 @@ class PromptCard(tk.Tk):
         self._status.set(f"{name}: {len(prompts)} prompts")
         self._reset_list_scroll()
 
+    def search_prompts(self) -> None:
+        query = self._search_query.get().strip()
+        self._clear(self.recent_frame)
+        if not query:
+            self.refresh()
+            return
+
+        matches = self._search_matches(query)
+        self._list_title.set(f"Search: {query}")
+        if not matches:
+            self._empty_row("No matching prompts.")
+            self._status.set("Search: 0 matches")
+            self._reset_list_scroll()
+            return
+
+        for path in matches:
+            rel = path.relative_to(PROMPTS_ROOT)
+            self._row(self.recent_frame, rel.as_posix(), lambda p=path: self.open_path(p))
+
+        self._status.set(f"Search: {len(matches)} matches")
+        self._reset_list_scroll()
+
+    def clear_search(self) -> None:
+        self._search_query.set("")
+        self.refresh()
+
+    def _search_matches(self, query: str) -> list[Path]:
+        needle = query.casefold()
+        matches: list[Path] = []
+        for path in self._all_prompt_files():
+            haystack = path.stem.casefold()
+            try:
+                haystack += "\n" + path.read_text(encoding="utf-8", errors="ignore").casefold()
+            except OSError:
+                pass
+            if needle in haystack:
+                matches.append(path)
+        matches.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+        return matches
+
     def _prompts_in_category(self, path: Path) -> list[Path]:
         if not path.exists():
             return []
@@ -225,15 +296,18 @@ class PromptCard(tk.Tk):
         return files
 
     def _recent_prompts(self) -> list[Path]:
+        files = self._all_prompt_files()
+        files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+        return files[:8]
+
+    def _all_prompt_files(self) -> list[Path]:
         if not PROMPTS_ROOT.exists():
             return []
-        files = [
+        return [
             path
             for path in PROMPTS_ROOT.rglob("*.md")
             if not self._is_hidden_prompt(path)
         ]
-        files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
-        return files[:8]
 
     def _is_hidden_prompt(self, path: Path) -> bool:
         skip = {"README.md", "Prompt_Template.md", "Role_Template.md", "\u6536\u85cf-\u6a21\u677f.md"}
@@ -295,10 +369,80 @@ class PromptCard(tk.Tk):
         result = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True)
         if result.returncode == 0:
             self._status.set("Synced")
+            self.update_git_status()
             messagebox.showinfo("Prompt Repository", "GitHub sync completed.")
         else:
             self._status.set("Sync failed")
+            self.update_git_status()
             messagebox.showerror("Prompt Repository", (result.stderr or result.stdout).strip())
+
+    def update_git_status(self) -> None:
+        git = self._git_command()
+        if not git:
+            self._git_status.set("Git: unavailable")
+            return
+
+        try:
+            status = subprocess.run(
+                [git, "status", "--porcelain"],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                timeout=8,
+            )
+            if status.returncode != 0:
+                self._git_status.set("Git: status failed")
+                return
+
+            relation = subprocess.run(
+                [git, "rev-list", "--left-right", "--count", "origin/main...HEAD"],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                timeout=8,
+            )
+            dirty = bool(status.stdout.strip())
+            ahead = 0
+            behind = 0
+            if relation.returncode == 0:
+                parts = relation.stdout.strip().split()
+                if len(parts) == 2:
+                    behind = int(parts[0])
+                    ahead = int(parts[1])
+
+            pieces = []
+            if dirty:
+                pieces.append("local changes")
+            if ahead:
+                pieces.append(f"{ahead} unpushed")
+            if behind:
+                pieces.append(f"{behind} behind")
+            if not pieces:
+                pieces.append("synced")
+            self._git_status.set("Git: " + ", ".join(pieces))
+        except (OSError, subprocess.SubprocessError, ValueError):
+            self._git_status.set("Git: status unavailable")
+
+    @staticmethod
+    def _git_command() -> str | None:
+        candidates = [
+            "git",
+            r"C:\Program Files\Git\cmd\git.exe",
+            r"C:\Program Files\Git\bin\git.exe",
+        ]
+        for candidate in candidates:
+            try:
+                result = subprocess.run(
+                    [candidate, "--version"],
+                    text=True,
+                    capture_output=True,
+                    timeout=5,
+                )
+            except OSError:
+                continue
+            if result.returncode == 0:
+                return candidate
+        return None
 
     def _toggle_topmost(self) -> None:
         self.attributes("-topmost", self._topmost.get())
