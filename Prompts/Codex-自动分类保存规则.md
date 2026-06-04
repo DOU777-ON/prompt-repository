@@ -2,7 +2,7 @@
 title: Codex-自动分类保存规则
 category: high-frequency
 status: favorite
-version: v1.0
+version: v1.3
 tags:
   - codex
   - auto-classification
@@ -24,6 +24,9 @@ source: internal
 - 如果用户修改了目录名称、模板结构、分类规则或生命周期规则，Codex 必须同步更新相关入库和调用提示词。
 - 高频工作流统一保存到 `Prompts/High-Frequency Workflows`。
 - 普通 Prompt 文件遵循当前 `Prompt_Template.md`，只保留 YAML、使用经验和优化记录。
+- 入库前先查重；发现高度相似内容时更新原文件，不创建同义重复文件。
+- 入库后运行 `scripts/update_index.ps1`，该脚本会更新 README 索引并触发桌面小卡片刷新。
+- 可直接被调用或复制的提示词正文应放在 `## Prompt 正文` 下，便于桌面小卡片只复制提示词本身。
 
 ## 优化记录
 
@@ -32,4 +35,4 @@ source: internal
 | v1.0 | 2026-06-04 | 初始版本 |
 | v1.1 | 2026-06-04 | 按新版 Prompt_Template 精简，仅保留使用经验和优化记录 |
 | v1.2 | 2026-06-04 | 增加 Obsidian 与 Codex 同步更新规则 |
-
+| v1.3 | 2026-06-04 | 增加入库查重、索引刷新、小卡片触发和 Prompt 正文提取规则 |
