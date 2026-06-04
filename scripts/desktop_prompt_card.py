@@ -1,0 +1,248 @@
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+import tkinter as tk
+from tkinter import messagebox
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PROMPTS_ROOT = REPO_ROOT / "Prompts"
+CATEGORIES = [
+    "Favorites",
+    "High-Frequency Workflows",
+    "\U0001f9e9 \u89d2\u8272\u5361",
+    "\U0001f4da \u4e13\u4e1a\u573a\u666f",
+    "\U0001f9ea \u6d4b\u8bd5",
+    "\U0001f4c4 \u6a21\u677f",
+]
+
+
+class PromptCard(tk.Tk):
+    def __init__(self) -> None:
+        super().__init__()
+        self.title("Prompt Repository")
+        self.geometry("340x500+960+120")
+        self.minsize(300, 420)
+        self.configure(bg="#f7f7f4")
+        self.attributes("-topmost", True)
+
+        self._drag_start_x = 0
+        self._drag_start_y = 0
+        self._topmost = tk.BooleanVar(value=True)
+        self._status = tk.StringVar(value="Ready")
+
+        self._build_ui()
+        self.refresh()
+
+    def _build_ui(self) -> None:
+        header = tk.Frame(self, bg="#202124", padx=12, pady=10)
+        header.pack(fill="x")
+        header.bind("<ButtonPress-1>", self._start_drag)
+        header.bind("<B1-Motion>", self._drag)
+
+        title = tk.Label(
+            header,
+            text="Prompt Repository",
+            fg="#ffffff",
+            bg="#202124",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+        )
+        title.pack(side="left", fill="x", expand=True)
+        title.bind("<ButtonPress-1>", self._start_drag)
+        title.bind("<B1-Motion>", self._drag)
+
+        topmost = tk.Checkbutton(
+            header,
+            text="Top",
+            variable=self._topmost,
+            command=self._toggle_topmost,
+            fg="#ffffff",
+            bg="#202124",
+            activebackground="#202124",
+            activeforeground="#ffffff",
+            selectcolor="#202124",
+        )
+        topmost.pack(side="right")
+
+        body = tk.Frame(self, bg="#f7f7f4", padx=12, pady=10)
+        body.pack(fill="both", expand=True)
+
+        controls = tk.Frame(body, bg="#f7f7f4")
+        controls.pack(fill="x", pady=(0, 10))
+
+        self._button(controls, "Refresh", self.refresh).pack(side="left", padx=(0, 6))
+        self._button(controls, "Open", self.open_repo).pack(side="left", padx=(0, 6))
+        self._button(controls, "Sync", self.sync_repo).pack(side="right")
+
+        tk.Label(
+            body,
+            text="Directories",
+            bg="#f7f7f4",
+            fg="#2b2b2b",
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill="x")
+
+        self.categories_frame = tk.Frame(body, bg="#f7f7f4")
+        self.categories_frame.pack(fill="x", pady=(4, 12))
+
+        tk.Label(
+            body,
+            text="Recent Prompts",
+            bg="#f7f7f4",
+            fg="#2b2b2b",
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill="x")
+
+        self.recent_frame = tk.Frame(body, bg="#f7f7f4")
+        self.recent_frame.pack(fill="both", expand=True, pady=(4, 8))
+
+        status = tk.Label(
+            self,
+            textvariable=self._status,
+            bg="#ecebe6",
+            fg="#555555",
+            anchor="w",
+            padx=10,
+            pady=5,
+            font=("Segoe UI", 9),
+        )
+        status.pack(fill="x")
+
+    def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=text,
+            command=command,
+            relief="flat",
+            bg="#ffffff",
+            fg="#222222",
+            activebackground="#e7eefc",
+            activeforeground="#111111",
+            padx=10,
+            pady=5,
+            font=("Segoe UI", 9),
+            cursor="hand2",
+        )
+
+    def refresh(self) -> None:
+        self._clear(self.categories_frame)
+        self._clear(self.recent_frame)
+
+        for name in CATEGORIES:
+            path = PROMPTS_ROOT / name
+            count = len(list(path.glob("*.md"))) if path.exists() else 0
+            label = f"{name}  ({count})"
+            self._row(self.categories_frame, label, lambda p=path: self.open_path(p))
+
+        recent = self._recent_prompts()
+        if not recent:
+            tk.Label(
+                self.recent_frame,
+                text="No prompts found.",
+                bg="#f7f7f4",
+                fg="#777777",
+                anchor="w",
+            ).pack(fill="x", pady=2)
+        else:
+            for path in recent:
+                rel = path.relative_to(PROMPTS_ROOT)
+                self._row(self.recent_frame, rel.as_posix(), lambda p=path: self.open_path(p))
+
+        self._status.set("Updated")
+
+    def _row(self, parent: tk.Widget, text: str, command) -> None:
+        button = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            relief="flat",
+            bg="#fdfdfb",
+            fg="#202124",
+            activebackground="#e8f0fe",
+            activeforeground="#111111",
+            anchor="w",
+            padx=10,
+            pady=7,
+            font=("Segoe UI", 9),
+            cursor="hand2",
+            wraplength=285,
+            justify="left",
+        )
+        button.pack(fill="x", pady=2)
+
+    def _recent_prompts(self) -> list[Path]:
+        skip = {"README.md", "Prompt_Template.md", "Role_Template.md", "\u6536\u85cf-\u6a21\u677f.md"}
+        if not PROMPTS_ROOT.exists():
+            return []
+        files = [
+            path
+            for path in PROMPTS_ROOT.rglob("*.md")
+            if path.name not in skip and "\u6a21\u677f" not in str(path.relative_to(PROMPTS_ROOT))
+        ]
+        files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+        return files[:8]
+
+    def open_repo(self) -> None:
+        self.open_path(REPO_ROOT)
+
+    def open_path(self, path: Path) -> None:
+        if not path.exists():
+            messagebox.showwarning("Prompt Repository", f"Path not found:\n{path}")
+            return
+        os.startfile(str(path))
+
+    def sync_repo(self) -> None:
+        script = REPO_ROOT / "scripts" / "sync_github.ps1"
+        if not script.exists():
+            messagebox.showwarning("Prompt Repository", f"Sync script not found:\n{script}")
+            return
+        self._status.set("Syncing...")
+        self.update_idletasks()
+        command = [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script),
+        ]
+        result = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True)
+        if result.returncode == 0:
+            self._status.set("Synced")
+            messagebox.showinfo("Prompt Repository", "GitHub sync completed.")
+        else:
+            self._status.set("Sync failed")
+            messagebox.showerror("Prompt Repository", (result.stderr or result.stdout).strip())
+
+    def _toggle_topmost(self) -> None:
+        self.attributes("-topmost", self._topmost.get())
+
+    def _start_drag(self, event: tk.Event) -> None:
+        self._drag_start_x = event.x
+        self._drag_start_y = event.y
+
+    def _drag(self, event: tk.Event) -> None:
+        x = self.winfo_pointerx() - self._drag_start_x
+        y = self.winfo_pointery() - self._drag_start_y
+        self.geometry(f"+{x}+{y}")
+
+    @staticmethod
+    def _clear(frame: tk.Widget) -> None:
+        for child in frame.winfo_children():
+            child.destroy()
+
+
+def main() -> int:
+    app = PromptCard()
+    app.mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
