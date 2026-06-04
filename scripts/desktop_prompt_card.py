@@ -102,8 +102,33 @@ class PromptCard(tk.Tk):
         )
         self.list_title_label.pack(fill="x")
 
-        self.recent_frame = tk.Frame(body, bg="#f7f7f4")
-        self.recent_frame.pack(fill="both", expand=True, pady=(4, 8))
+        list_container = tk.Frame(body, bg="#f7f7f4")
+        list_container.pack(fill="both", expand=True, pady=(4, 8))
+
+        self.list_canvas = tk.Canvas(
+            list_container,
+            bg="#f7f7f4",
+            highlightthickness=0,
+            bd=0,
+        )
+        self.list_scrollbar = tk.Scrollbar(
+            list_container,
+            orient="vertical",
+            command=self.list_canvas.yview,
+        )
+        self.recent_frame = tk.Frame(self.list_canvas, bg="#f7f7f4")
+        self.recent_window = self.list_canvas.create_window(
+            (0, 0),
+            window=self.recent_frame,
+            anchor="nw",
+        )
+        self.list_canvas.configure(yscrollcommand=self.list_scrollbar.set)
+        self.list_canvas.pack(side="left", fill="both", expand=True)
+        self.list_scrollbar.pack(side="right", fill="y")
+        self.recent_frame.bind("<Configure>", self._update_scroll_region)
+        self.list_canvas.bind("<Configure>", self._resize_scroll_window)
+        self.list_canvas.bind("<Enter>", self._bind_mousewheel)
+        self.list_canvas.bind("<Leave>", self._unbind_mousewheel)
 
         status = tk.Label(
             self,
@@ -153,6 +178,7 @@ class PromptCard(tk.Tk):
                 self._row(self.recent_frame, rel.as_posix(), lambda p=path: self.open_path(p))
 
         self._status.set("Updated")
+        self._reset_list_scroll()
 
     def _row(self, parent: tk.Widget, text: str, command) -> None:
         button = tk.Button(
@@ -189,6 +215,7 @@ class PromptCard(tk.Tk):
             self._row(self.recent_frame, label, lambda p=prompt: self.open_path(p))
 
         self._status.set(f"{name}: {len(prompts)} prompts")
+        self._reset_list_scroll()
 
     def _prompts_in_category(self, path: Path) -> list[Path]:
         if not path.exists():
@@ -221,6 +248,25 @@ class PromptCard(tk.Tk):
             fg="#777777",
             anchor="w",
         ).pack(fill="x", pady=2)
+
+    def _update_scroll_region(self, _event: tk.Event | None = None) -> None:
+        self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all"))
+
+    def _resize_scroll_window(self, event: tk.Event) -> None:
+        self.list_canvas.itemconfigure(self.recent_window, width=event.width)
+
+    def _reset_list_scroll(self) -> None:
+        self.update_idletasks()
+        self.list_canvas.yview_moveto(0)
+
+    def _bind_mousewheel(self, _event: tk.Event) -> None:
+        self.list_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, _event: tk.Event) -> None:
+        self.list_canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event: tk.Event) -> None:
+        self.list_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def open_repo(self) -> None:
         self.open_path(REPO_ROOT)
