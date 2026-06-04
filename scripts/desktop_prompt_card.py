@@ -37,6 +37,7 @@ class PromptCard(tk.Tk):
         self._list_title = tk.StringVar(value="Recent Prompts")
         self._search_query = tk.StringVar()
         self._last_refresh_marker = self._refresh_marker_stamp()
+        self._selected_prompt: Path | None = None
 
         self._build_ui()
         self.refresh()
@@ -208,7 +209,7 @@ class PromptCard(tk.Tk):
         else:
             for path in recent:
                 rel = path.relative_to(PROMPTS_ROOT)
-                self._row(self.recent_frame, rel.as_posix(), lambda p=path: self.open_path(p))
+                self._prompt_row(self.recent_frame, rel.as_posix(), path)
 
         self._status.set("Updated")
         self._reset_list_scroll()
@@ -247,7 +248,7 @@ class PromptCard(tk.Tk):
 
         for prompt in prompts:
             label = prompt.stem
-            self._row(self.recent_frame, label, lambda p=prompt: self.open_path(p))
+            self._prompt_row(self.recent_frame, label, prompt)
 
         self._status.set(f"{name}: {len(prompts)} prompts")
         self._reset_list_scroll()
@@ -269,7 +270,7 @@ class PromptCard(tk.Tk):
 
         for path in matches:
             rel = path.relative_to(PROMPTS_ROOT)
-            self._row(self.recent_frame, rel.as_posix(), lambda p=path: self.open_path(p))
+            self._prompt_row(self.recent_frame, rel.as_posix(), path)
 
         self._status.set(f"Search: {len(matches)} matches")
         self._reset_list_scroll()
@@ -326,6 +327,110 @@ class PromptCard(tk.Tk):
             fg="#777777",
             anchor="w",
         ).pack(fill="x", pady=2)
+
+    def _prompt_row(self, parent: tk.Widget, text: str, path: Path) -> None:
+        label = tk.Label(
+            parent,
+            text=text,
+            bg="#fdfdfb",
+            fg="#202124",
+            anchor="w",
+            padx=10,
+            pady=7,
+            font=("Segoe UI", 9),
+            cursor="hand2",
+            wraplength=285,
+            justify="left",
+        )
+        label.pack(fill="x", pady=2)
+        label.bind("<Button-1>", lambda _event, widget=label, p=path: self.select_prompt(widget, p))
+        label.bind("<Double-Button-1>", lambda _event, p=path: self.fill_codex_input(p))
+
+    def select_prompt(self, widget: tk.Label, path: Path) -> None:
+        self._selected_prompt = path
+        for child in self.recent_frame.winfo_children():
+            if isinstance(child, tk.Label):
+                child.configure(bg="#fdfdfb")
+        widget.configure(bg="#e8f0fe")
+        self._status.set(f"Selected: {path.stem}")
+
+    def fill_codex_input(self, path: Path) -> None:
+        text = self._prompt_text(path)
+        if not text.strip():
+            self._status.set("Prompt is empty")
+            messagebox.showwarning("Prompt Repository", f"No prompt text found:\n{path}")
+            return
+
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        self.update_idletasks()
+
+        if self._paste_into_codex():
+            self._status.set(f"Filled Codex: {path.stem}")
+        else:
+            self._status.set(f"Copied: {path.stem}")
+            messagebox.showinfo(
+                "Prompt Repository",
+                "Prompt copied to clipboard. Click the Codex input box and press Ctrl+V.",
+            )
+
+    def _prompt_text(self, path: Path) -> str:
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return ""
+
+        body = self._strip_frontmatter(content)
+        section = self._section_after_heading(body, "Prompt 正文")
+        if section.strip():
+            return section.strip()
+
+        return body.strip()
+
+    @staticmethod
+    def _strip_frontmatter(content: str) -> str:
+        lines = content.splitlines()
+        if len(lines) < 3 or lines[0].strip() != "---":
+            return content
+        for index in range(1, len(lines)):
+            if lines[index].strip() == "---":
+                return "\n".join(lines[index + 1 :]).strip()
+        return content
+
+    @staticmethod
+    def _section_after_heading(content: str, heading: str) -> str:
+        lines = content.splitlines()
+        capture = False
+        result: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("## "):
+                if capture:
+                    break
+                capture = stripped == f"## {heading}"
+                continue
+            if capture:
+                result.append(line)
+        return "\n".join(result)
+
+    def _paste_into_codex(self) -> bool:
+        script = (
+            "$ws = New-Object -ComObject WScript.Shell; "
+            "$ok = $ws.AppActivate('Codex'); "
+            "Start-Sleep -Milliseconds 250; "
+            "if ($ok) { $ws.SendKeys('^v') }; "
+            "if ($ok) { exit 0 } else { exit 1 }"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", script],
+                text=True,
+                capture_output=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return result.returncode == 0
 
     def _update_scroll_region(self, _event: tk.Event | None = None) -> None:
         self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all"))
