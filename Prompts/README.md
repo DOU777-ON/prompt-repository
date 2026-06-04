@@ -67,7 +67,7 @@ YAML frontmatter
 
 | Title | Status | Tags | Updated | Path |
 |---|---|---|---|---|
-| 总图 | testing | prompt, 总图, engineering-layout, site-plan, general-plan | 2026-06-04 | [📚 专业场景/总图.md](📚 专业场景/总图.md) |
+| 总图 | testing | prompt, 总图, engineering-layout, site-plan, general-plan, vertical-design | 2026-06-04 | [📚 专业场景/总图.md](📚 专业场景/总图.md) |
 
 ### 🧩 角色卡
 
