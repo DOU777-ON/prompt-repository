@@ -364,15 +364,7 @@ class PromptCard(tk.Tk):
         self.clipboard_clear()
         self.clipboard_append(text)
         self.update_idletasks()
-
-        if self._paste_into_codex():
-            self._status.set(f"Pasted to Codex: {path.stem}")
-        else:
-            self._status.set(f"Copied: {path.stem}")
-            messagebox.showinfo(
-                "Prompt Repository",
-                "Prompt copied to clipboard. Click the Codex input box and press Ctrl+V.",
-            )
+        self._status.set(f"Copied prompt: {path.stem}")
 
     def _prompt_text(self, path: Path) -> str:
         try:
@@ -443,37 +435,6 @@ class PromptCard(tk.Tk):
                 result.append(line)
 
         return "\n".join(result)
-
-    def _paste_into_codex(self) -> bool:
-        script = (
-            "Add-Type @'\n"
-            "using System;\n"
-            "using System.Runtime.InteropServices;\n"
-            "public class Win32 {\n"
-            "  [DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);\n"
-            "  [DllImport(\"user32.dll\")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);\n"
-            "}\n"
-            "'@; "
-            "$p = Get-Process Codex -ErrorAction SilentlyContinue | "
-            "Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; "
-            "if (-not $p) { exit 1 }; "
-            "[Win32]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null; "
-            "[Win32]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; "
-            "Start-Sleep -Milliseconds 500; "
-            "$ws = New-Object -ComObject WScript.Shell; "
-            "$ws.SendKeys('^v'); "
-            "exit 0"
-        )
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", script],
-                text=True,
-                capture_output=True,
-                timeout=5,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return False
-        return result.returncode == 0
 
     def _update_scroll_region(self, _event: tk.Event | None = None) -> None:
         self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all"))
