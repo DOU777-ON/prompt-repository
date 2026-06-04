@@ -1,6 +1,5 @@
 param(
-    [string]$RepoRoot,
-    [switch]$NoCard
+    [string]$RepoRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -130,20 +129,3 @@ if ($readme -notmatch [regex]::Escape($beginMarker) -or $readme -notmatch [regex
 
 Set-Content -Encoding utf8 -LiteralPath $readmePath -Value ($readme.TrimEnd() + "`r`n")
 Write-Host "Updated index: $readmePath"
-
-$markerPath = Join-Path $RepoRoot ".prompt-card-refresh"
-Set-Content -Encoding ascii -LiteralPath $markerPath -Value (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-
-if (-not $NoCard) {
-    $cardScript = Join-Path $RepoRoot "scripts\desktop_prompt_card.py"
-    if (Test-Path -LiteralPath $cardScript) {
-        $running = Get-CimInstance Win32_Process -Filter "name = 'pythonw.exe' or name = 'python.exe'" |
-            Where-Object { $_.CommandLine -like "*desktop_prompt_card.py*" }
-        if (-not $running) {
-            Start-Process pythonw.exe -ArgumentList "`"$cardScript`"" -WorkingDirectory $RepoRoot
-            Write-Host "Opened Prompt Repository card."
-        } else {
-            Write-Host "Prompt Repository card refresh triggered."
-        }
-    }
-}
