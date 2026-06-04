@@ -19,3 +19,6 @@ desktop.ini
 # Python cache
 __pycache__/
 *.py[cod]
+
+# Desktop card refresh signal
+.prompt-card-refresh

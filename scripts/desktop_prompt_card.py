@@ -9,6 +9,7 @@ from tkinter import messagebox
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROMPTS_ROOT = REPO_ROOT / "Prompts"
+REFRESH_MARKER = REPO_ROOT / ".prompt-card-refresh"
 CATEGORIES = [
     "Favorites",
     "High-Frequency Workflows",
@@ -35,10 +36,12 @@ class PromptCard(tk.Tk):
         self._git_status = tk.StringVar(value="Git: checking...")
         self._list_title = tk.StringVar(value="Recent Prompts")
         self._search_query = tk.StringVar()
+        self._last_refresh_marker = self._refresh_marker_stamp()
 
         self._build_ui()
         self.refresh()
         self.update_git_status()
+        self.after(3000, self._watch_refresh_marker)
 
     def _build_ui(self) -> None:
         header = tk.Frame(self, bg="#202124", padx=12, pady=10)
@@ -210,6 +213,7 @@ class PromptCard(tk.Tk):
         self._status.set("Updated")
         self._reset_list_scroll()
         self.update_git_status()
+        self._last_refresh_marker = self._refresh_marker_stamp()
 
     def _row(self, parent: tk.Widget, text: str, command) -> None:
         button = tk.Button(
@@ -443,6 +447,21 @@ class PromptCard(tk.Tk):
             if result.returncode == 0:
                 return candidate
         return None
+
+    def _watch_refresh_marker(self) -> None:
+        stamp = self._refresh_marker_stamp()
+        if stamp > self._last_refresh_marker:
+            self._last_refresh_marker = stamp
+            self.refresh()
+            self._status.set("Prompt repository updated")
+        self.after(3000, self._watch_refresh_marker)
+
+    @staticmethod
+    def _refresh_marker_stamp() -> float:
+        try:
+            return REFRESH_MARKER.stat().st_mtime
+        except OSError:
+            return 0.0
 
     def _toggle_topmost(self) -> None:
         self.attributes("-topmost", self._topmost.get())
