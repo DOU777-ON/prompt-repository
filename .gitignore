@@ -16,3 +16,6 @@ desktop.ini
 *.bak
 *.log
 
+# Python cache
+__pycache__/
+*.py[cod]
