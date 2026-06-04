@@ -33,6 +33,7 @@ class PromptCard(tk.Tk):
         self._drag_start_y = 0
         self._topmost = tk.BooleanVar(value=True)
         self._status = tk.StringVar(value="Ready")
+        self._list_title = tk.StringVar(value="Recent Prompts")
 
         self._build_ui()
         self.refresh()
@@ -75,6 +76,7 @@ class PromptCard(tk.Tk):
         controls.pack(fill="x", pady=(0, 10))
 
         self._button(controls, "Refresh", self.refresh).pack(side="left", padx=(0, 6))
+        self._button(controls, "Home", self.refresh).pack(side="left", padx=(0, 6))
         self._button(controls, "Open", self.open_repo).pack(side="left", padx=(0, 6))
         self._button(controls, "Sync", self.sync_repo).pack(side="right")
 
@@ -90,14 +92,15 @@ class PromptCard(tk.Tk):
         self.categories_frame = tk.Frame(body, bg="#f7f7f4")
         self.categories_frame.pack(fill="x", pady=(4, 12))
 
-        tk.Label(
+        self.list_title_label = tk.Label(
             body,
-            text="Recent Prompts",
+            textvariable=self._list_title,
             bg="#f7f7f4",
             fg="#2b2b2b",
             font=("Segoe UI", 10, "bold"),
             anchor="w",
-        ).pack(fill="x")
+        )
+        self.list_title_label.pack(fill="x")
 
         self.recent_frame = tk.Frame(body, bg="#f7f7f4")
         self.recent_frame.pack(fill="both", expand=True, pady=(4, 8))
@@ -138,17 +141,12 @@ class PromptCard(tk.Tk):
             path = PROMPTS_ROOT / name
             count = len(list(path.glob("*.md"))) if path.exists() else 0
             label = f"{name}  ({count})"
-            self._row(self.categories_frame, label, lambda p=path: self.open_path(p))
+            self._row(self.categories_frame, label, lambda p=path, n=name: self.show_category(n, p))
 
+        self._list_title.set("Recent Prompts")
         recent = self._recent_prompts()
         if not recent:
-            tk.Label(
-                self.recent_frame,
-                text="No prompts found.",
-                bg="#f7f7f4",
-                fg="#777777",
-                anchor="w",
-            ).pack(fill="x", pady=2)
+            self._empty_row("No prompts found.")
         else:
             for path in recent:
                 rel = path.relative_to(PROMPTS_ROOT)
@@ -176,17 +174,53 @@ class PromptCard(tk.Tk):
         )
         button.pack(fill="x", pady=2)
 
+    def show_category(self, name: str, path: Path) -> None:
+        self._clear(self.recent_frame)
+        self._list_title.set(name)
+
+        prompts = self._prompts_in_category(path)
+        if not prompts:
+            self._empty_row("No prompts in this directory.")
+            self._status.set(f"{name}: 0 prompts")
+            return
+
+        for prompt in prompts:
+            label = prompt.stem
+            self._row(self.recent_frame, label, lambda p=prompt: self.open_path(p))
+
+        self._status.set(f"{name}: {len(prompts)} prompts")
+
+    def _prompts_in_category(self, path: Path) -> list[Path]:
+        if not path.exists():
+            return []
+        files = [item for item in path.glob("*.md") if not self._is_hidden_prompt(item)]
+        files.sort(key=lambda item: item.stem.lower())
+        return files
+
     def _recent_prompts(self) -> list[Path]:
-        skip = {"README.md", "Prompt_Template.md", "Role_Template.md", "\u6536\u85cf-\u6a21\u677f.md"}
         if not PROMPTS_ROOT.exists():
             return []
         files = [
             path
             for path in PROMPTS_ROOT.rglob("*.md")
-            if path.name not in skip and "\u6a21\u677f" not in str(path.relative_to(PROMPTS_ROOT))
+            if not self._is_hidden_prompt(path)
         ]
         files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
         return files[:8]
+
+    def _is_hidden_prompt(self, path: Path) -> bool:
+        skip = {"README.md", "Prompt_Template.md", "Role_Template.md", "\u6536\u85cf-\u6a21\u677f.md"}
+        relative = path.relative_to(PROMPTS_ROOT)
+        return path.name in skip or "\u6a21\u677f" in str(relative)
+
+    def _empty_row(self, text: str) -> None:
+        tk.Label(
+            self.recent_frame,
+            text=text,
+            bg="#f7f7f4",
+            fg="#777777",
+            anchor="w",
+        ).pack(fill="x", pady=2)
 
     def open_repo(self) -> None:
         self.open_path(REPO_ROOT)
