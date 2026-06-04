@@ -366,7 +366,7 @@ class PromptCard(tk.Tk):
         self.update_idletasks()
 
         if self._paste_into_codex():
-            self._status.set(f"Filled Codex: {path.stem}")
+            self._status.set(f"Pasted to Codex: {path.stem}")
         else:
             self._status.set(f"Copied: {path.stem}")
             messagebox.showinfo(
@@ -385,7 +385,7 @@ class PromptCard(tk.Tk):
         if section.strip():
             return section.strip()
 
-        return body.strip()
+        return self._prompt_body_only(body).strip()
 
     @staticmethod
     def _strip_frontmatter(content: str) -> str:
@@ -411,6 +411,37 @@ class PromptCard(tk.Tk):
                 continue
             if capture:
                 result.append(line)
+        return "\n".join(result)
+
+    @staticmethod
+    def _prompt_body_only(content: str) -> str:
+        stop_headings = {
+            "使用经验",
+            "优化记录",
+            "维护记录",
+            "测试记录",
+            "说明",
+            "备注",
+            "元数据",
+        }
+        lines = content.splitlines()
+        result: list[str] = []
+        seen_body = False
+
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                continue
+            if stripped.startswith("## "):
+                heading = stripped.removeprefix("## ").strip()
+                if heading in stop_headings:
+                    break
+                seen_body = True
+                result.append(line)
+                continue
+            if stripped or seen_body:
+                result.append(line)
+
         return "\n".join(result)
 
     def _paste_into_codex(self) -> bool:
